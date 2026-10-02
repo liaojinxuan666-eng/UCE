@@ -1,12 +1,13 @@
 # Logos 核心组件 10：自然语言理解引擎 (Logos NLU Engine)
 from vsa_engine import HyperVector
 import re
+import array
+import random
 
 class LogosNLU:
     def __init__(self, seed_library):
         self.library = seed_library
         
-        # 词库扩展：加入基础对话词汇和问候语
         self.lexicon = {
             "写代码": ["写", "弄", "搞", "生成", "编写", "代码", "程序"],
             "循环": ["循环", "反复", "遍历", "for", "while"],
@@ -16,12 +17,11 @@ class LogosNLU:
             "C语言": ["c", "C语言", "c语言"],
             "C++": ["cpp", "C++", "c++"],
             "Python": ["python", "py", "Python"],
-            # 日常闲聊词汇
             "问候": ["你好", "在吗", "hello", "hi", "嗨"],
-            "闲聊": ["无聊", "天气", "心情", "累", "开心", "难过", "今天"]
+            "闲聊": ["无聊", "天气", "心情", "累", "开心", "难过", "今天", "傻子", "笨"]
         }
         
-        # 初始化意图向量（这里为演示，随机生成，实际应通过数据喂食）
+        # 意图超维向量
         self.intents = {
             "generate_code": HyperVector.random(),
             "greet": HyperVector.random(),
@@ -30,14 +30,12 @@ class LogosNLU:
         }
 
     def _get_word_vector(self, word):
-        """从种子库获取词汇的超维向量，如果不存在则生成占位向量"""
-        # 实际应用中，这里应该去查询数据库或内存中的词向量表
-        # 为了演示，我们用固定随机种子生成稳定的向量
-        import random
+        """从种子库获取词汇的超维向量"""
+        # 使用固定哈希种子，保证同一个词每次生成一样的向量
         r = random.Random(hash(word))
-        bits = [r.getrandbits(1) for _ in range(10000)]
-        v = HyperVector(dim=10000)
-        v.bits = bits
+        v = HyperVector()
+        # 修正：直接给 bits 赋值
+        v.bits = array.array('B', [r.getrandbits(1) for _ in range(v.DIM)])
         return v
 
     def perceive_intent(self, text):
@@ -48,7 +46,7 @@ class LogosNLU:
         if not words:
             return "unknown"
         
-        # 2. 构建句子的超维向量（将所有词汇向量捆绑）
+        # 2. 构建句子的超维向量
         sentence_vector = self._get_word_vector(words[0])
         for w in words[1:]:
             sentence_vector = sentence_vector.bundle(self._get_word_vector(w))
@@ -77,17 +75,14 @@ class LogosNLU:
             "math_op": None
         }
         
-        # 语言识别
         if any(word in text for word in self.lexicon["C++"]): params["target_lang"] = "cpp"
         elif any(word in text for word in self.lexicon["C语言"]): params["target_lang"] = "c"
         elif any(word in text for word in self.lexicon["Python"]): params["target_lang"] = "python"
             
-        # 运算符识别
         if any(word in text for word in self.lexicon["计算"]):
             if "乘积" in text or "乘" in text: params["math_op"] = "PRIM_MATH_MUL"
             else: params["math_op"] = "PRIM_MATH_ADD"
             
-        # 范围识别
         match = re.search(r"(\d+)\s*(?:到|至|~|-)\s*(\d+)", text)
         if match: params["loop_range"] = (match.group(1), match.group(2))
             
@@ -97,10 +92,11 @@ class LogosNLU:
         intent = self.perceive_intent(user_input)
         
         if intent == "generate_code":
+            params = self.extract_parameters(user_input)
             return {
                 "intent": "generate_code",
-                "target_lang": self.extract_parameters(user_input)["target_lang"],
-                "params": self.extract_parameters(user_input)
+                "target_lang": params["target_lang"],
+                "params": params
             }
         else:
             return {"intent": intent}
