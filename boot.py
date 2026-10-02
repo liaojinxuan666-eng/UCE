@@ -72,12 +72,16 @@ def main():
         intent = parse_result.get("intent")
         
         if intent == "generate_code":
-            # 提取到参数，开始合成代码
+            # 先检查 NLU 解析时是不是已经报错了
+            if "error" in parse_result:
+                print(f"Logos: 抱歉，我的逻辑推演遇到了阻碍：{parse_result['error']}")
+                continue
+                
             target_lang = parse_result.get("target_lang")
             logic_tree = parse_result.get("logic_tree")
             
-            if "error" in logic_tree:
-                print(f"Logos: 抱歉，我的逻辑推演遇到了阻碍：{logic_tree['error']}")
+            if logic_tree is None:
+                print("Logos: 我没能理解这个逻辑组合，请换个说法。")
                 continue
 
             # 尝试从数据库里查询历史经验 (自我进化记忆)
