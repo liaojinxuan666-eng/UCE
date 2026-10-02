@@ -50,7 +50,7 @@ def main():
     synthesizer = CodeSynthesizer(seed_lib)
 
     print("\n[系统] Logos 启动完毕！输入 'exit' 退出。")
-    print("你可以试着说："用C语言打印1到10" 或 "用Python写个循环打印1到5"。\n")
+    print("你可以试着说：'用C语言打印1到10' 或 '用Python写个循环打印1到5'。\n")
 
     # 4. 主循环 (Loop)
     while True:
