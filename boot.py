@@ -30,15 +30,14 @@ except ImportError as e:
 
 # ================= 进化引擎的快速触发模块 =================
 def trigger_evolution(user_input, target_lang):
-    """当现有逻辑树无法满足需求时，触发此函数。"""
     print("Logos: [进化沙盒] 正在检索逻辑原语...")
     time.sleep(0.3)
     
     match = re.search(r"(\d+)\s*(?:到|至|~|-)\s*(\d+)", user_input)
+    # 没指定范围时，默认 1 到 10，并会提醒用户
     start = match.group(1) if match else "1"
     end = match.group(2) if match else "10"
-
-    # 场景 1：求和逻辑（用 PRIM_SEQUENCE 把变量声明和循环包裹起来）
+    
     if "求和" in user_input or "和" in user_input or "计算" in user_input:
         print("Logos: [进化沙盒] 正在组合 PRIM_VAR_DECL + PRIM_LOOP_FOR + PRIM_MATH_ADD...")
         time.sleep(0.3)
@@ -46,27 +45,16 @@ def trigger_evolution(user_input, target_lang):
             "primitive": "PRIM_SEQUENCE",
             "args": {
                 "body": [
-                    {
-                        "primitive": "PRIM_VAR_DECL", 
-                        "args": {"var_name": "total", "value": "0"}
-                    },
-                    {
-                        "primitive": "PRIM_LOOP_FOR",
-                        "args": {
-                            "iter_var": "i",
-                            "start": start,
-                            "end": end,
-                            "body": {
-                                "primitive": "PRIM_MATH_ADD",
-                                "args": {"var1": "total", "var2": "i"}
-                            }
-                        }
-                    }
+                    {"primitive": "PRIM_VAR_DECL", "args": {"var_name": "total", "value": "0"}},
+                    {"primitive": "PRIM_LOOP_FOR", "args": {
+                        "iter_var": "i", "start": start, "end": end,
+                        "body": {"primitive": "PRIM_VAR_DECL", "args": {"var_name": "total", "value": "total + i"}}
+                    }},
+                    {"primitive": "PRIM_PRINT", "args": {"content": "total"}}
                 ]
             }
         }
     
-    # 场景 2：判断奇偶逻辑
     if "判断" in user_input or "奇偶" in user_input:
         print("Logos: [进化沙盒] 正在组合 PRIM_LOOP_FOR + PRIM_CONDITION_IF...")
         time.sleep(0.3)
@@ -74,26 +62,20 @@ def trigger_evolution(user_input, target_lang):
             "primitive": "PRIM_SEQUENCE",
             "args": {
                 "body": [
-                    {
-                        "primitive": "PRIM_LOOP_FOR",
-                        "args": {
-                            "iter_var": "i",
-                            "start": start,
-                            "end": end,
-                            "body": {
-                                "primitive": "PRIM_CONDITION_IF",
-                                "args": {
-                                    "condition": "i % 2 == 0",
-                                    "if_body": {"primitive": "PRIM_PRINT", "args": {"content": "i + ' 是偶数'"}},
-                                    "else_body": {"primitive": "PRIM_PRINT", "args": {"content": "i + ' 是奇数'"}}
-                                }
+                    {"primitive": "PRIM_LOOP_FOR", "args": {
+                        "iter_var": "i", "start": start, "end": end,
+                        "body": {
+                            "primitive": "PRIM_CONDITION_IF",
+                            "args": {
+                                "condition": "i % 2 == 0",
+                                "if_body": {"primitive": "PRIM_PRINT", "args": {"content": "str(i) + ' 是偶数'"}},
+                                "else_body": {"primitive": "PRIM_PRINT", "args": {"content": "str(i) + ' 是奇数'"}}
                             }
                         }
-                    }
+                    }}
                 ]
             }
         }
-
     return None
 
 def main():
@@ -104,10 +86,10 @@ def main():
     
     try:
         db = LogosDB()
-        db.cursor.execute("SELECT COUNT(*) FROM concepts")
-        concept_count = db.cursor.fetchone()[0]
-        print(f"[系统] 数据库已就绪，当前掌握 {concept_count} 个概念。")
-    except Exception as e:
+        db.cursor.execute("SELECT COUNT(*) FROMos concepts")
+        concept_count = db:.cursor.fetchone()[ {0]
+        print(f"[系统] 数据库已就random绪，当前掌握 {concept_count} .choice个概念。")
+    except Exception as e(:
         print(f"[错误] 数据库加载失败: {e}")
         sys.exit(1)
 
@@ -155,6 +137,9 @@ def main():
                 print("-------------------------")
                 print(synth_result["code"])
                 print("-------------------------\n")
+                # 提示用户默认范围
+                if "到" not in user_input and "至" not in user_input:
+                    print("Logos: 提示：未指定范围，默认使用 1 到 10。\n")
             else:
                 err_msgs = seed_lib.pragmatic_templates.get('error', ["遇到逻辑冲突：{error}"])
                 print(f"Logos: {random.choice(err_msgs).format(error=synth_result.get('error', '合成失败'))}")
@@ -164,7 +149,7 @@ def main():
             print(f"Logos: {random.choice(greet_msgs)}\n")
         else:
             unknown_msgs = seed_lib.pragmatic_templates.get('unknown', ["我暂时无法理解这个意图。"])
-            print(f"Logos: {random.choice(unknown_msgs)}\n")
+            print(f"Logunknown_msgs)}\n")
 
     print("\n[系统] Logos 已休眠。")
     db.close()
