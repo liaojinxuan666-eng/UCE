@@ -55,7 +55,7 @@ def main():
     synthesizer = CodeSynthesizer(seed_lib)
 
     print("\n[系统] Logos 启动完毕！输入 'exit' 退出。")
-    print("你可以试着说：'计算1到5的乘积' 或 '计算1到100的和'。\n")
+    print("你可以试着说：'计算1到5的乘积' 或 '今天天气真好'。\n")
 
     while True:
         try:
@@ -76,11 +76,9 @@ def main():
             target_lang = parse_result.get("target_lang", "python")
             params = parse_result.get("params", {})
             
-            # 提取范围，如果没有，默认1到10
             loop_range = params.get("loop_range", ("1", "10"))
             start, end = loop_range[0], loop_range[1]
             
-            # 使用签名查询缓存（先用NLU识别出的操作符，如果没有则标记为NONE）
             math_op_hint = params.get("math_op", "NONE")
             signature = f"{target_lang}_{math_op_hint}_{start}_{end}"
             
@@ -92,21 +90,16 @@ def main():
                 synth_result = synthesizer.synthesize_from_evolution(cached_tree, cached_lang)
             else:
                 print(f"Logos: [记忆检索] 未找到匹配经验 (签名: {signature})")
-                
-                # 尝试计算目标值
                 target_output = calculate_target_output(start, end, math_op_hint)
                 
                 if target_output is not None:
                     print(f"Logos: [真·进化沙盒] 目标输出已知为 {target_output}，启动随机变异与试错...")
-                    
-                    # 实例化真正的进化器，让它自己去猜测运算符和初始值
                     evolver = CAEvolver(target_output, start, end, synthesizer, max_generations=20, population_size=10)
                     evolved_tree, discovered_op, discovered_init = evolver.evolve()
                     
                     if evolved_tree:
                         synth_result = synthesizer.synthesize_from_evolution(evolved_tree, target_lang)
                         if synth_result and synth_result.get("success"):
-                            # 固化正确的签名
                             real_math_op = "PRIM_MATH_MUL" if discovered_op == "*" else "PRIM_MATH_ADD"
                             real_signature = f"{target_lang}_{real_math_op}_{start}_{end}"
                             db.add_code_experience(real_signature, evolved_tree, target_lang)
@@ -116,7 +109,6 @@ def main():
                 else:
                     print("Logos: [进化沙盒] 无法解析参数，尝试失败。")
                     
-            # 输出结果
             if synth_result and synth_result.get("success"):
                 success_msgs = seed_lib.pragmatic_templates.get('success', ["执行完毕，结果如下："])
                 print(f"\nLogos: {random.choice(success_msgs)}")
@@ -130,6 +122,11 @@ def main():
         elif intent == "greet":
             greet_msgs = seed_lib.pragmatic_templates.get('greet', ["你好，我是 Logos。"])
             print(f"Logos: {random.choice(greet_msgs)}\n")
+            
+        elif intent == "chat":
+            chat_msgs = seed_lib.pragmatic_templates.get('chat', ["我在听。"])
+            print(f"Logos: {random.choice(chat_msgs)}\n")
+            
         else:
             unknown_msgs = seed_lib.pragmatic_templates.get('unknown', ["我暂时无法理解这个意图。"])
             print(f"Logos: {random.choice(unknown_msgs)}\n")
