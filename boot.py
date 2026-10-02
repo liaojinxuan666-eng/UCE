@@ -32,16 +32,16 @@ except ImportError as e:
 def trigger_evolution(user_input, target_lang):
     """当现有逻辑树无法满足需求时，触发此函数。"""
     print("Logos: [进化沙盒] 正在检索逻辑原语...")
-    time.sleep(0.4)
+    time.sleep(0.3)
     
     match = re.search(r"(\d+)\s*(?:到|至|~|-)\s*(\d+)", user_input)
     start = match.group(1) if match else "1"
     end = match.group(2) if match else "10"
 
-    # 场景 1：求和逻辑
+    # 场景 1：求和逻辑（修复了结构：直接返回循环树）
     if "求和" in user_input or "和" in user_input or "计算" in user_input:
         print("Logos: [进化沙盒] 正在组合 PRIM_VAR_DECL + PRIM_LOOP_FOR + PRIM_MATH_ADD...")
-        time.sleep(0.4)
+        time.sleep(0.3)
         return {
             "primitive": "PRIM_VAR_DECL",
             "args": {
@@ -62,10 +62,10 @@ def trigger_evolution(user_input, target_lang):
             }
         }
     
-    # 场景 2：判断奇偶逻辑
+    # 场景 2：判断奇偶逻辑（修复了缩进结构）
     if "判断" in user_input or "奇偶" in user_input:
         print("Logos: [进化沙盒] 正在组合 PRIM_LOOP_FOR + PRIM_CONDITION_IF...")
-        time.sleep(0.4)
+        time.sleep(0.3)
         return {
             "primitive": "PRIM_LOOP_FOR",
             "args": {
@@ -105,7 +105,7 @@ def main():
     synthesizer = CodeSynthesizer(seed_lib)
 
     print("\n[系统] Logos 启动完毕！输入 'exit' 退出。")
-    print("你可以试着说：'用C语言打印1到10' 或 '计算1到100的和'。\n")
+    print("你可以试着说：'计算1到100的和' 或 '用Python写个判断奇偶数的代码'。\n")
 
     while True:
         try:
@@ -118,7 +118,7 @@ def main():
         if not user_input:
             continue
 
-        time.sleep(0.3)
+        time.sleep(0.2)
         parse_result = nlu.parse(user_input)
         intent = parse_result.get("intent")
         
@@ -126,21 +126,18 @@ def main():
             target_lang = parse_result.get("target_lang", "python")
             synth_result = None
             
-            # 步骤 1：尝试使用现有的种子库逻辑
             if "logic_tree" in parse_result:
                 synth_result = synthesizer.synthesize_from_evolution(parse_result["logic_tree"], target_lang)
             
-            # 步骤 2：如果种子库没有逻辑，触发进化沙盒
             if not synth_result or not synth_result.get("success"):
                 evolved_tree = trigger_evolution(user_input, target_lang)
                 if evolved_tree:
                     synth_result = synthesizer.synthesize_from_evolution(evolved_tree, target_lang)
                 else:
-                    err_msgs = seed_lib.pragmatic_templates.get('error', ["抱歉，我的逻辑推演遇到了阻碍：{error}"])
-                    print(f"Logos: {random.choice(err_msgs).format(error=parse_result.get('error', '无法识别的逻辑'))}")
+                    err_msgs = seed_lib.pragmatic_templates.get('error', ["抱歉，逻辑推演遇到阻碍：{error}"])
+                    print(f"Logos: {random.choice(err_msgs).format(error=parse_result.get('error', '无法识别'))}")
                     continue
             
-            # 步骤 3：输出结果
             if synth_result and synth_result.get("success"):
                 success_msgs = seed_lib.pragmatic_templates.get('success', ["执行完毕，结果如下："])
                 print(f"\nLogos: {random.choice(success_msgs)}")
@@ -148,15 +145,14 @@ def main():
                 print(synth_result["code"])
                 print("-------------------------\n")
             else:
-                err_msgs = seed_lib.pragmatic_templates.get('error', ["遇到了一点逻辑冲突：{error}"])
-                print(f"Logos: {random.choice(err_msgs).format(error=synth_result.get('error', '逻辑合成失败'))}")
+                err_msgs = seed_lib.pragmatic_templates.get('error', ["遇到逻辑冲突：{error}"])
+                print(f"Logos: {random.choice(err_msgs).format(error=synth_result.get('error', '合成失败'))}")
                 
         elif intent == "greet":
             greet_msgs = seed_lib.pragmatic_templates.get('greet', ["你好，我是 Logos。"])
             print(f"Logos: {random.choice(greet_msgs)}\n")
-            
         else:
-            unknown_msgs = seed_lib.pragmatic_templates.get('unknown', ["我暂时无法理解这个意图，你可以换个说法。"])
+            unknown_msgs = seed_lib.pragmatic_templates.get('unknown', ["我暂时无法理解这个意图。"])
             print(f"Logos: {random.choice(unknown_msgs)}\n")
 
     print("\n[系统] Logos 已休眠。")
