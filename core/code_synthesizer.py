@@ -6,24 +6,17 @@ class CodeSynthesizer:
         self.library = seed_library
 
     def synthesize(self, logic_tree, target_lang="python", indent_level=0):
-        """递归解析逻辑树，生成目标语言的代码字符串。"""
         if not logic_tree:
             return ""
-
         if isinstance(logic_tree, list):
-            codes = []
-            for item in logic_tree:
-                codes.append(self.synthesize(item, target_lang, indent_level))
+            codes = [self.synthesize(item, target_lang, indent_level) for item in logic_tree]
             return "\n".join(codes)
 
         primitive = logic_tree.get("primitive")
         args = logic_tree.get("args", {})
 
-        # PRIM_SEQUENCE 是透明容器，内部元素共享当前缩进层级
         if primitive == "PRIM_SEQUENCE":
-            sub_codes = []
-            for item in args.get("body", []):
-                sub_codes.append(self.synthesize(item, target_lang, indent_level))
+            sub_codes = [self.synthesize(item, target_lang, indent_level) for item in args.get("body", [])]
             return "\n".join(sub_codes)
 
         template = self.library.get_language_template(target_lang, primitive)
@@ -33,12 +26,9 @@ class CodeSynthesizer:
         processed_args = {}
         for key, value in args.items():
             if isinstance(value, dict) and "primitive" in value:
-                # 嵌套逻辑块：缩进加 1 级
                 processed_args[key] = self.synthesize(value, target_lang, indent_level + 1)
             elif isinstance(value, list):
-                sub_codes = []
-                for item in value:
-                    sub_codes.append(self.synthesize(item, target_lang, indent_level))
+                sub_codes = [self.synthesize(item, target_lang, indent_level) for item in value]
                 processed_args[key] = "\n".join(sub_codes)
             else:
                 processed_args[key] = str(value)
@@ -48,7 +38,6 @@ class CodeSynthesizer:
         except KeyError as e:
             return f"# 模板填充失败，缺少参数: {e}"
 
-        # 根据当前层级添加缩进
         if indent_level > 0:
             code_segment = self._indent_code(code_segment, indent_level)
 
@@ -56,12 +45,7 @@ class CodeSynthesizer:
 
     def _indent_code(self, code_str, level):
         lines = code_str.split('\n')
-        indented_lines = []
-        for line in lines:
-            if line.strip():
-                indented_lines.append("    " * level + line)
-            else:
-                indented_lines.append("")
+        indented_lines = [("    " * level + line) if line.strip() else "" for line in lines]
         return "\n".join(indented_lines)
 
     def validate_syntax(self, code_str, target_lang="python"):

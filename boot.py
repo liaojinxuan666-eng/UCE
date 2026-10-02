@@ -5,7 +5,6 @@ import random
 import time
 import re
 
-# ================= 路径兼容处理 =================
 BASE_DIR = pathlib.Path(__file__).parent
 sys.path.append(str(BASE_DIR))
 sys.path.append(str(BASE_DIR / "core"))
@@ -29,31 +28,35 @@ except ImportError as e:
         sys.exit(1)
 
 # ================= 进化引擎的快速触发模块 =================
-def trigger_evolution(user_input, target_lang):
+def trigger_evolution(user_input, params, target_lang):
     print("Logos: [进化沙盒] 正在检索逻辑原语...")
     time.sleep(0.3)
     
-    match = re.search(r"(\d+)\s*(?:到|至|~|-)\s*(\d+)", user_input)
-    start = match.group(1) if match else "1"
-    end = match.group(2) if match else "10"
-    
-    if "求和" in user_input or "和" in user_input or "计算" in user_input:
-        print("Logos: [进化沙盒] 正在组合 PRIM_VAR_DECL + PRIM_LOOP_FOR + PRIM_MATH_ADD...")
+    loop_range = params.get("loop_range", ("1", "10"))
+    start, end = loop_range[0], loop_range[1]
+    math_op = params.get("math_op")
+
+    if math_op:
+        print(f"Logos: [进化沙盒] 正在组合 PRIM_VAR_DECL + PRIM_LOOP_FOR + {math_op}...")
         time.sleep(0.3)
+        
+        # 核心修复：如果是乘法，初始值必须是 1，而不是 0
+        init_value = "1" if math_op == "PRIM_MATH_MUL" else "0"
+        
         return {
             "primitive": "PRIM_SEQUENCE",
             "args": {
                 "body": [
-                    {"primitive": "PRIM_VAR_DECL", "args": {"var_name": "total", "value": "0"}},
+                    {"primitive": "PRIM_VAR_DECL", "args": {"var_name": "total", "value": init_value}},
                     {"primitive": "PRIM_LOOP_FOR", "args": {
                         "iter_var": "i", "start": start, "end": end,
-                        "body": {"primitive": "PRIM_VAR_DECL", "args": {"var_name": "total", "value": "total + i"}}
+                        "body": {"primitive": "PRIM_VAR_DECL", "args": {"var_name": "total", "value": f"total { '+' if math_op == 'PRIM_MATH_ADD' else '*' } i"}}
                     }},
                     {"primitive": "PRIM_PRINT", "args": {"content": "total"}}
                 ]
             }
         }
-    
+
     if "判断" in user_input or "奇偶" in user_input:
         print("Logos: [进化沙盒] 正在组合 PRIM_LOOP_FOR + PRIM_CONDITION_IF...")
         time.sleep(0.3)
@@ -85,7 +88,6 @@ def main():
     
     try:
         db = LogosDB()
-        # 这里就是刚才出错的地方，修正为正确的点号
         db.cursor.execute("SELECT COUNT(*) FROM concepts")
         concept_count = db.cursor.fetchone()[0]
         print(f"[系统] 数据库已就绪，当前掌握 {concept_count} 个概念。")
@@ -98,7 +100,7 @@ def main():
     synthesizer = CodeSynthesizer(seed_lib)
 
     print("\n[系统] Logos 启动完毕！输入 'exit' 退出。")
-    print("你可以试着说：'计算1到100的和' 或 '用Python写个判断奇偶数的代码'。\n")
+    print("你可以试着说：'计算1到100的和' 或 '计算1到5的乘积'。\n")
 
     while True:
         try:
@@ -117,19 +119,13 @@ def main():
         
         if intent == "generate_code":
             target_lang = parse_result.get("target_lang", "python")
+            params = parse_result.get("params", {})
             synth_result = None
             
-            if "logic_tree" in parse_result:
-                synth_result = synthesizer.synthesize_from_evolution(parse_result["logic_tree"], target_lang)
-            
-            if not synth_result or not synth_result.get("success"):
-                evolved_tree = trigger_evolution(user_input, target_lang)
-                if evolved_tree:
-                    synth_result = synthesizer.synthesize_from_evolution(evolved_tree, target_lang)
-                else:
-                    err_msgs = seed_lib.pragmatic_templates.get('error', ["抱歉，逻辑推演遇到阻碍：{error}"])
-                    print(f"Logos: {random.choice(err_msgs).format(error=parse_result.get('error', '无法识别'))}")
-                    continue
+            # 直接交给进化沙盒动态处理
+            evolved_tree = trigger_evolution(user_input, params, target_lang)
+            if evolved_tree:
+                synth_result = synthesizer.synthesize_from_evolution(evolved_tree, target_lang)
             
             if synth_result and synth_result.get("success"):
                 success_msgs = seed_lib.pragmatic_templates.get('success', ["执行完毕，结果如下："])
