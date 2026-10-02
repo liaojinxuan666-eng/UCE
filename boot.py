@@ -38,48 +38,59 @@ def trigger_evolution(user_input, target_lang):
     start = match.group(1) if match else "1"
     end = match.group(2) if match else "10"
 
-    # 场景 1：求和逻辑（修复了结构：直接返回循环树）
+    # 场景 1：求和逻辑（用 PRIM_SEQUENCE 把变量声明和循环包裹起来）
     if "求和" in user_input or "和" in user_input or "计算" in user_input:
         print("Logos: [进化沙盒] 正在组合 PRIM_VAR_DECL + PRIM_LOOP_FOR + PRIM_MATH_ADD...")
         time.sleep(0.3)
         return {
-            "primitive": "PRIM_VAR_DECL",
+            "primitive": "PRIM_SEQUENCE",
             "args": {
-                "var_name": "total",
-                "value": "0",
-                "body": {
-                    "primitive": "PRIM_LOOP_FOR",
-                    "args": {
-                        "iter_var": "i",
-                        "start": start,
-                        "end": end,
-                        "body": {
-                            "primitive": "PRIM_MATH_ADD",
-                            "args": {"var1": "total", "var2": "i"}
+                "body": [
+                    {
+                        "primitive": "PRIM_VAR_DECL", 
+                        "args": {"var_name": "total", "value": "0"}
+                    },
+                    {
+                        "primitive": "PRIM_LOOP_FOR",
+                        "args": {
+                            "iter_var": "i",
+                            "start": start,
+                            "end": end,
+                            "body": {
+                                "primitive": "PRIM_MATH_ADD",
+                                "args": {"var1": "total", "var2": "i"}
+                            }
                         }
                     }
-                }
+                ]
             }
         }
     
-    # 场景 2：判断奇偶逻辑（修复了缩进结构）
+    # 场景 2：判断奇偶逻辑
     if "判断" in user_input or "奇偶" in user_input:
         print("Logos: [进化沙盒] 正在组合 PRIM_LOOP_FOR + PRIM_CONDITION_IF...")
         time.sleep(0.3)
         return {
-            "primitive": "PRIM_LOOP_FOR",
+            "primitive": "PRIM_SEQUENCE",
             "args": {
-                "iter_var": "i",
-                "start": start,
-                "end": end,
-                "body": {
-                    "primitive": "PRIM_CONDITION_IF",
-                    "args": {
-                        "condition": "i % 2 == 0",
-                        "if_body": {"primitive": "PRIM_PRINT", "args": {"content": "i + ' 是偶数'"}},
-                        "else_body": {"primitive": "PRIM_PRINT", "args": {"content": "i + ' 是奇数'"}}
+                "body": [
+                    {
+                        "primitive": "PRIM_LOOP_FOR",
+                        "args": {
+                            "iter_var": "i",
+                            "start": start,
+                            "end": end,
+                            "body": {
+                                "primitive": "PRIM_CONDITION_IF",
+                                "args": {
+                                    "condition": "i % 2 == 0",
+                                    "if_body": {"primitive": "PRIM_PRINT", "args": {"content": "i + ' 是偶数'"}},
+                                    "else_body": {"primitive": "PRIM_PRINT", "args": {"content": "i + ' 是奇数'"}}
+                                }
+                            }
+                        }
                     }
-                }
+                ]
             }
         }
 
