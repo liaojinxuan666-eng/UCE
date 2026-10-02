@@ -7,22 +7,29 @@ import pathlib
 import random
 import time
 
-# 确保能导入各个模块（根据你的实际文件夹结构，可能需微调）
-sys.path.append(str(pathlib.Path(__file__).parent))
-sys.path.append(str(pathlib.Path(__file__).parent / "core"))
-sys.path.append(str(pathlib.Path(__file__).parent / "db"))
-sys.path.append(str(pathlib.Path(__file__).parent / "nlu"))
-sys.path.append(str(pathlib.Path(__file__).parent / "trainer"))
+# ================= 路径兼容处理 =================
+BASE_DIR = pathlib.Path(__file__).parent
+sys.path.append(str(BASE_DIR))
+sys.path.append(str(BASE_DIR / "core"))
+sys.path.append(str(BASE_DIR / "db"))
+sys.path.append(str(BASE_DIR / "nlu"))
+sys.path.append(str(BASE_DIR / "trainer"))
 
 try:
     from db.logos_db import LogosDB
     from nlu.logos_nlu import LogosNLU
-    from uce_seed_library import LogosSeedLibrary
-    from code_synthesizer import CodeSynthesizer
+    from core.uce_seed_library import LogosSeedLibrary
+    from core.code_synthesizer import CodeSynthesizer
 except ImportError as e:
-    print(f"导入模块失败，请检查文件夹结构。错误: {e}")
-    print("确保 core/ db/ nlu/ trainer/ 文件夹里有对应的 .py 文件，且项目根目录下有 boot.py")
-    sys.exit(1)
+    # 兼容平铺目录的情况
+    try:
+        from logos_db import LogosDB
+        from logos_nlu import LogosNLU
+        from uce_seed_library import LogosSeedLibrary
+        from code_synthesizer import CodeSynthesizer
+    except ImportError as e2:
+        print(f"导入模块失败，请检查文件夹结构。错误: {e2}")
+        sys.exit(1)
 
 def main():
     print("=======================================")
@@ -32,14 +39,17 @@ def main():
     
     # 1. 初始化数据库和记忆
     print("[系统] 正在加载长期记忆数据库...")
-    db = LogosDB()
-    # 检查数据库是否有基础数据
-    db.cursor.execute("SELECT COUNT(*) FROM concepts")
-    concept_count = db.cursor.fetchone()[0]
-    if concept_count == 0:
-        print(">>> 警告：数据库是空的！请先运行 python trainer/data_feeder.py 喂食初始知识。")
-    else:
-        print(f"[系统] 数据库已就绪，当前掌握 {concept_count} 个概念。")
+    try:
+        db = LogosDB()
+        db.cursor.execute("SELECT COUNT(*) FROM concepts")
+        concept_count = db.cursor.fetchone()[0]
+        if concept_count == 0:
+            print(">>> 警告：数据库是空的！请先运行 python trainer/data_feeder.py 喂食初始知识。")
+        else:
+            print(f"[系统] 数据库已就绪，当前掌握 {concept_count} 个概念。")
+    except Exception as e:
+        print(f"[错误] 数据库加载失败: {e}")
+        sys.exit(1)
 
     # 2. 初始化种子库 (包含逻辑原语和语用模板)
     print("[系统] 加载种子标准库...")
@@ -74,7 +84,8 @@ def main():
         if intent == "generate_code":
             # 先检查 NLU 解析时是不是已经报错了
             if "error" in parse_result:
-                print(f"Logos: 抱歉，我的逻辑推演遇到了阻碍：{parse_result['error']}")
+                err_msgs = seed_lib.pragmatic_templates.get('error', ["抱歉，我的逻辑推演遇到了阻碍：{error}"])
+                print(f"Logos: {random.choice(err_msgs).format(error=parse_result['error'])}")
                 continue
                 
             target_lang = parse_result.get("target_lang")
@@ -84,27 +95,27 @@ def main():
                 print("Logos: 我没能理解这个逻辑组合，请换个说法。")
                 continue
 
-            # 尝试从数据库里查询历史经验 (自我进化记忆)
-            # (目前我们直接传给合成器，后续可在数据库里做缓存查询)
-            
             # 阶段 3: 行动 (手 - 合成代码)
             synth_result = synthesizer.synthesize_from_evolution(logic_tree, target_lang)
             
             # 阶段 4: 表达 (嘴)
             if synth_result["success"]:
-                print(f"\nLogos: {random.choice(seed_lib.pragmatic_templates['success'])}")
+                success_msgs = seed_lib.pragmatic_templates.get('success', ["执行完毕，结果是：", "推演成功，得出的结论是："])
+                print(f"\nLogos: {random.choice(success_msgs)}")
                 print("-------------------------")
                 print(synth_result["code"])
                 print("-------------------------\n")
             else:
-                print(f"Logos: {random.choice(seed_lib.pragmatic_templates['error'])}")
-                print(f"错误详情: {synth_result['error']}\n")
+                err_msgs = seed_lib.pragmatic_templates.get('error', ["遇到了一点逻辑冲突：{error}"])
+                print(f"Logos: {random.choice(err_msgs).format(error=synth_result['error'])}")
                 
         elif intent == "greet":
-            print(f"Logos: {random.choice(seed_lib.pragmatic_templates['greet'])}\n")
+            greet_msgs = seed_lib.pragmatic_templates.get('greet', ["你好，我是 Logos。"])
+            print(f"Logos: {random.choice(greet_msgs)}\n")
             
         else:
-            print(f"Logos: {random.choice(seed_lib.pragmatic_templates['unknown'])}\n")
+            unknown_msgs = seed_lib.pragmatic_templates.get('unknown', ["我暂时无法理解这个意图，你可以换个说法。"])
+            print(f"Logos: {random.choice(unknown_msgs)}\n")
 
     print("\n[系统] Logos 已休眠。")
     db.close()
