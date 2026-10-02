@@ -40,7 +40,6 @@ def trigger_evolution(user_input, params, target_lang):
         print(f"Logos: [进化沙盒] 正在组合 PRIM_VAR_DECL + PRIM_LOOP_FOR + {math_op}...")
         time.sleep(0.3)
         
-        # 核心修复：如果是乘法，初始值必须是 1，而不是 0
         init_value = "1" if math_op == "PRIM_MATH_MUL" else "0"
         
         return {
@@ -88,9 +87,9 @@ def main():
     
     try:
         db = LogosDB()
-        db.cursor.execute("SELECT COUNT(*) FROM concepts")
-        concept_count = db.cursor.fetchone()[0]
-        print(f"[系统] 数据库已就绪，当前掌握 {concept_count} 个概念。")
+        db.cursor.execute("SELECT COUNT(*) FROM code_experience")
+        exp_count = db.cursor.fetchone()[0]
+        print(f"[系统] 数据库已就绪，当前掌握 {exp_count} 条逻辑经验。")
     except Exception as e:
         print(f"[错误] 数据库加载失败: {e}")
         sys.exit(1)
@@ -122,10 +121,32 @@ def main():
             params = parse_result.get("params", {})
             synth_result = None
             
-            # 直接交给进化沙盒动态处理
-            evolved_tree = trigger_evolution(user_input, params, target_lang)
-            if evolved_tree:
-                synth_result = synthesizer.synthesize_from_evolution(evolved_tree, target_lang)
+            # ================= 核心：构建记忆签名 =================
+            math_op = params.get("math_op", "NONE")
+            loop_range = params.get("loop_range", ("1", "10"))
+            # 签名格式：语言_操作_起始_结束 (例如: python_MUL_1_5)
+            signature = f"{target_lang}_{math_op}_{loop_range[0]}_{loop_range[1]}"
+            
+            # 步骤 1：从数据库检索是否有现成的经验
+            cached_tree, cached_lang = db.get_experience_by_signature(signature)
+            
+            if cached_tree:
+                print(f"Logos: [记忆检索] 发现匹配的历史经验！(签名: {signature})")
+                synth_result = synthesizer.synthesize_from_evolution(cached_tree, cached_lang)
+            else:
+                # 步骤 2：如果没有经验，则触发进化沙盒
+                print(f"Logos: [记忆检索] 未找到匹配经验 (签名: {signature})，启动进化沙盒...")
+                evolved_tree = trigger_evolution(user_input, params, target_lang)
+                if evolved_tree:
+                    synth_result = synthesizer.synthesize_from_evolution(evolved_tree, target_lang)
+                    # 成功生成代码后，存入数据库！
+                    if synth_result and synth_result.get("success"):
+                        db.add_code_experience(signature, evolved_tree, target_lang)
+                        print(f"Logos: [记忆固化] 已将新逻辑存入长期记忆。")
+                else:
+                    err_msgs = seed_lib.pragmatic_templates.get('error', ["抱歉，逻辑推演遇到阻碍：{error}"])
+                    print(f"Logos: {random.choice(err_msgs).format(error=parse_result.get('error', '无法识别'))}")
+                    continue
             
             if synth_result and synth_result.get("success"):
                 success_msgs = seed_lib.pragmatic_templates.get('success', ["执行完毕，结果如下："])
@@ -133,8 +154,6 @@ def main():
                 print("-------------------------")
                 print(synth_result["code"])
                 print("-------------------------\n")
-                if "到" not in user_input and "至" not in user_input:
-                    print("Logos: 提示：未指定范围，默认使用 1 到 10。\n")
             else:
                 err_msgs = seed_lib.pragmatic_templates.get('error', ["遇到逻辑冲突：{error}"])
                 print(f"Logos: {random.choice(err_msgs).format(error=synth_result.get('error', '合成失败'))}")
