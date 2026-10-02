@@ -21,37 +21,46 @@ class LogosNLU:
             "闲聊": ["无聊", "天气", "心情", "累", "开心", "难过", "今天", "傻子", "笨"]
         }
         
-        # 意图超维向量
+        # 核心修复：基于词库构建真实的语义意图向量
         self.intents = {
-            "generate_code": HyperVector.random(),
-            "greet": HyperVector.random(),
-            "chat": HyperVector.random(),
+            "generate_code": self._build_intent_vector(
+                self.lexicon["写代码"] + self.lexicon["计算"] + self.lexicon["循环"] + self.lexicon["打印"]
+            ),
+            "greet": self._build_intent_vector(self.lexicon["问候"]),
+            "chat": self._build_intent_vector(self.lexicon["闲聊"]),
             "unknown": HyperVector.random()
         }
 
     def _get_word_vector(self, word):
-        """从种子库获取词汇的超维向量"""
-        # 使用固定哈希种子，保证同一个词每次生成一样的向量
+        """根据词汇生成稳定的超维向量"""
         r = random.Random(hash(word))
         v = HyperVector()
-        # 修正：直接给 bits 赋值
+        # 直接给 bits 赋值
         v.bits = array.array('B', [r.getrandbits(1) for _ in range(v.DIM)])
+        return v
+
+    def _build_intent_vector(self, word_list):
+        """将属于同一个意图的所有词汇向量捆绑起来，形成概念中心"""
+        if not word_list:
+            return HyperVector.random()
+        v = self._get_word_vector(word_list[0])
+        for w in word_list[1:]:
+            v = v.bundle(self._get_word_vector(w))
         return v
 
     def perceive_intent(self, text):
         """基于 VSA 语义相似度的意图识别"""
-        # 1. 分词
         words = [w for w in re.findall(r'[\u4e00-\u9fa5]|[a-zA-Z0-9]+', text.lower()) if w.strip()]
         
         if not words:
             return "unknown"
         
-        # 2. 构建句子的超维向量
+        # 构建用户输入的超维向量
         sentence_vector = self._get_word_vector(words[0])
         for w in words[1:]:
             sentence_vector = sentence_vector.bundle(self._get_word_vector(w))
             
-        # 3. 与预定义的意图向量进行相似度比对
+        # 与概念中心进行相似度比对
         best_intent = "unknown"
         highest_sim = 0.0
         
@@ -61,8 +70,9 @@ class LogosNLU:
                 highest_sim = sim
                 best_intent = intent_name
                 
-        # 4. 如果相似度太低，降级为未知
-        if highest_sim < 0.55:
+        # VSA 相似度通常分布在 0.5 左右，我们取最高分
+        # 如果没有明显的高分，才判定为未知
+        if highest_sim < 0.5:
             return "unknown"
             
         return best_intent
