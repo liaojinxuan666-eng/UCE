@@ -10,7 +10,6 @@ class LogosNLU:
         self.library = seed_library
         
         # 1. 初始化近义词/关键词映射表 (纯字典，占内存极小)
-        # 这里把我们希望它能听懂的词，映射到种子库的逻辑原语
         self.lexicon = {
             "写代码": ["写", "弄", "搞", "生成", "编写"],
             "循环": ["循环", "反复", "遍历", "for", "while"],
@@ -20,7 +19,7 @@ class LogosNLU:
             "Python": ["python", "py", "Python"]
         }
         
-        # 2. 初始化意图超维向量
+        # 2. 初始化意图超维向量 (保留以兼容未来 VSA 升级，目前先用规则匹配)
         self.intents = {
             "generate_code": HyperVector.random(),
             "greet": HyperVector.random(),
@@ -28,6 +27,7 @@ class LogosNLU:
         }
         
         # 3. 预定义参数提取正则（纯代码）
+        # 匹配：1到10, 1-10, 1~10, 1至10
         self.range_pattern = re.compile(r"(\d+)\s*(?:到|至|~|-)\s*(\d+)")
 
     def tokenize(self, text):
@@ -60,22 +60,20 @@ class LogosNLU:
 
     def perceive_intent(self, text):
         """
-        意图识别：利用 VSA 相似度来判断用户想干嘛
+        意图识别：基于关键词的精准规则匹配（取代随机占位符）
         """
-        # 简化处理：把用户输入当作一个整体向量（后续可替换为词语向量捆绑）
-        # 这里用一个占位逻辑，实际应用中会将分词后的向量进行 bundle
-        query_vec = HyperVector.random() 
+        text_lower = text.lower()
         
-        best_intent = None
-        highest_sim = 0.0
-        
-        for intent_name, intent_vec in self.intents.items():
-            sim = query_vec.similarity(intent_vec)
-            if sim > highest_sim:
-                highest_sim = sim
-                best_intent = intent_name
-                
-        return best_intent
+        # 1. 优先识别代码生成请求
+        if any(word in text_lower for word in ["用", "写", "弄", "搞", "生成", "打印", "循环", "c语言", "cpp", "python", "代码"]):
+            return "generate_code"
+            
+        # 2. 识别打招呼
+        if any(word in text_lower for word in ["你好", "在吗", "hello", "hi"]):
+            return "greet"
+            
+        # 3. 其他
+        return "unknown"
 
     def extract_parameters(self, text):
         """
@@ -96,8 +94,12 @@ class LogosNLU:
             params["target_lang"] = "python"
             
         # 2. 提取动作原语
-        if any(word in text for word in self.lexicon["循环"]):
+        has_range = self.range_pattern.search(text) is not None
+        
+        # 核心修复：如果提到"打印"并且有数字范围（如 1到10），自动推演出需要"循环"
+        if any(word in text for word in self.lexicon["循环"]) or (has_range and "打印" in text):
             params["actions"].append("PRIM_LOOP_FOR")
+            
         if any(word in text for word in self.lexicon["打印"]):
             params["actions"].append("PRIM_PRINT")
             
@@ -146,7 +148,7 @@ class LogosNLU:
         intent = self.perceive_intent(user_input)
         
         if intent != "generate_code":
-            return {"intent": intent, "message": "我需要处理的是代码生成任务。"}
+            return {"intent": intent}
             
         # 2. 提取参数
         params = self.extract_parameters(user_input)
@@ -154,6 +156,7 @@ class LogosNLU:
         # 3. 构建逻辑树
         logic_tree = self.build_logic_tree(params)
         
+        # 如果逻辑树里有 error，直接把 error 传回去，不再传 logic_tree
         if "error" in logic_tree:
             return {"intent": intent, "error": logic_tree["error"]}
             
