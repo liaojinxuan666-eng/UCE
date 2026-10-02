@@ -1,4 +1,5 @@
 # Logos 数据库操作层
+# 纯 Python 标准库，使用 SQLite（单文件，零配置，断电不丢数据）
 import sqlite3
 import json
 import pathlib
@@ -23,7 +24,29 @@ class LogosDB:
         self.init_tables()
 
     def init_tables(self):
-        # 重建表，增加 signature 字段用于快速匹配
+        # 1. 概念表：存词汇、VSA向量
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS concepts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE,
+                vsa_bits TEXT,
+                type TEXT DEFAULT 'word'
+            )
+        ''')
+        
+        # 2. 关系表
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS relations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subject_id INTEGER,
+                relation TEXT,
+                object_id INTEGER,
+                FOREIGN KEY(subject_id) REFERENCES concepts(id),
+                FOREIGN KEY(object_id) REFERENCES concepts(id)
+            )
+        ''')
+        
+        # 3. 代码经验表（带签名，用于记忆复用）
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS code_experience (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,8 +59,35 @@ class LogosDB:
         ''')
         self.conn.commit()
 
-    # 核心：查询是否存在类似的逻辑经验
+    # ================= 概念与关系操作 =================
+    def add_concept(self, name, type="word"):
+        if not name: return None
+        v = HyperVector.random()
+        vsa_str = ''.join(str(b) for b in v.bits)
+        try:
+            self.cursor.execute(
+                "INSERT INTO concepts (name, vsa_bits, type) VALUES (?, ?, ?)",
+                (name, vsa_str, type)
+            )
+            self.conn.commit()
+            return self.cursor.lastrowid
+        except sqlite3.IntegrityError:
+            self.cursor.execute("SELECT id FROM concepts WHERE name=?", (name,))
+            return self.cursor.fetchone()[0]
+
+    def add_relation(self, subject_name, relation, object_name):
+        subj_id = self.add_concept(subject_name)
+        obj_id = self.add_concept(object_name)
+        if subj_id and obj_id:
+            self.cursor.execute(
+                "INSERT INTO relations (subject_id, relation, object_id) VALUES (?, ?, ?)",
+                (subj_id, relation, obj_id)
+            )
+            self.conn.commit()
+
+    # ================= 记忆复用操作 =================
     def get_experience_by_signature(self, signature):
+        """根据签名查询是否有现成的逻辑经验"""
         self.cursor.execute(
             "SELECT logic_tree, target_lang FROM code_experience WHERE signature=?",
             (signature,)
@@ -47,8 +97,8 @@ class LogosDB:
             return json.loads(row[0]), row[1]
         return None, None
 
-    # 核心：保存成功的逻辑树
     def add_code_experience(self, signature, logic_tree_dict, target_lang):
+        """将成功的逻辑树存入数据库"""
         try:
             self.cursor.execute(
                 "INSERT OR REPLACE INTO code_experience (signature, logic_tree, target_lang) VALUES (?, ?, ?)",
