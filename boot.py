@@ -15,6 +15,7 @@ sys.path.append(str(BASE_DIR / "db"))
 sys.path.append(str(BASE_DIR / "nlu"))
 sys.path.append(str(BASE_DIR / "trainer"))
 
+# 尝试导入核心模块
 try:
     from db.logos_db import LogosDB
     from nlu.logos_nlu import LogosNLU
@@ -82,7 +83,7 @@ def main():
         intent = parse_result.get("intent")
         
         if intent == "generate_code":
-            # 先检查 NLU 解析时是不是已经报错了
+            # 检查 NLU 解析时是不是已经报错了（比如逻辑冲突）
             if "error" in parse_result:
                 err_msgs = seed_lib.pragmatic_templates.get('error', ["抱歉，我的逻辑推演遇到了阻碍：{error}"])
                 print(f"Logos: {random.choice(err_msgs).format(error=parse_result['error'])}")
@@ -100,11 +101,19 @@ def main():
             
             # 阶段 4: 表达 (嘴)
             if synth_result["success"]:
-                success_msgs = seed_lib.pragmatic_templates.get('success', ["执行完毕，结果是：", "推演成功，得出的结论是："])
+                success_msgs = seed_lib.pragmatic_templates.get('success', ["执行完毕，结果如下："])
                 print(f"\nLogos: {random.choice(success_msgs)}")
                 print("-------------------------")
                 print(synth_result["code"])
                 print("-------------------------\n")
+                
+                # ======== 预留接口：真正的进化引擎接入点 ========
+                # 当用户要求更复杂的逻辑（如"计算1到100的和"）时，
+                # 我们让系统提示准备进化，但这部分逻辑需要 ca_evolver 的实际参与。
+                # 目前我们只检测关键词，并提示用户"正在准备进化"。
+                if any(kw in user_input for kw in ["和", "累加", "求和"]):
+                    print("Logos: 这属于未知的复合逻辑。正在唤醒元胞自动机进化沙盒...")
+                    print("Logos: [进化引擎待接入，当前只返回基础模板结果]\n")
             else:
                 err_msgs = seed_lib.pragmatic_templates.get('error', ["遇到了一点逻辑冲突：{error}"])
                 print(f"Logos: {random.choice(err_msgs).format(error=synth_result['error'])}")
