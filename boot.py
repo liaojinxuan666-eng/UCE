@@ -29,15 +29,11 @@ except ImportError as e:
         sys.exit(1)
 
 # ================= 进化引擎的快速触发模块 =================
-def trigger_evolution(user_input, seed_lib, target_lang):
-    """
-    当现有逻辑树无法满足需求时，触发此函数。
-    为了让 Logos 能在手机端真正"想出办法"，这里会根据语义动态拼接逻辑树。
-    """
+def trigger_evolution(user_input, target_lang):
+    """当现有逻辑树无法满足需求时，触发此函数。"""
     print("Logos: [进化沙盒] 正在检索逻辑原语...")
     time.sleep(0.4)
     
-    # 动态提取数字范围
     match = re.search(r"(\d+)\s*(?:到|至|~|-)\s*(\d+)", user_input)
     start = match.group(1) if match else "1"
     end = match.group(2) if match else "10"
@@ -128,15 +124,15 @@ def main():
         
         if intent == "generate_code":
             target_lang = parse_result.get("target_lang", "python")
+            synth_result = None
             
             # 步骤 1：尝试使用现有的种子库逻辑
-            synth_result = None
             if "logic_tree" in parse_result:
                 synth_result = synthesizer.synthesize_from_evolution(parse_result["logic_tree"], target_lang)
             
             # 步骤 2：如果种子库没有逻辑，触发进化沙盒
             if not synth_result or not synth_result.get("success"):
-                evolved_tree = trigger_evolution(user_input, seed_lib, target_lang)
+                evolved_tree = trigger_evolution(user_input, target_lang)
                 if evolved_tree:
                     synth_result = synthesizer.synthesize_from_evolution(evolved_tree, target_lang)
                 else:
@@ -145,7 +141,7 @@ def main():
                     continue
             
             # 步骤 3：输出结果
-            if synth_result["success"]:
+            if synth_result and synth_result.get("success"):
                 success_msgs = seed_lib.pragmatic_templates.get('success', ["执行完毕，结果如下："])
                 print(f"\nLogos: {random.choice(success_msgs)}")
                 print("-------------------------")
@@ -153,7 +149,7 @@ def main():
                 print("-------------------------\n")
             else:
                 err_msgs = seed_lib.pragmatic_templates.get('error', ["遇到了一点逻辑冲突：{error}"])
-                print(f"Logos: {random.choice(err_msgs).format(error=synth_result['error'])}")
+                print(f"Logos: {random.choice(err_msgs).format(error=synth_result.get('error', '逻辑合成失败'))}")
                 
         elif intent == "greet":
             greet_msgs = seed_lib.pragmatic_templates.get('greet', ["你好，我是 Logos。"])

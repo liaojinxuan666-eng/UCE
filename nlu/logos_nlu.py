@@ -25,32 +25,24 @@ class LogosNLU:
             "query_memory": HyperVector.random()
         }
         
-        # 匹配 1到10 这种范围
         self.range_pattern = re.compile(r"(\d+)\s*(?:到|至|~|-)\s*(\d+)")
 
     def perceive_intent(self, text):
-        """意图识别：基于关键词的精准规则匹配"""
         text_lower = text.lower()
-        
-        # 只要包含这些核心动词，就判定为写代码意图
         code_keywords = ["用", "写", "弄", "搞", "生成", "打印", "循环", "c语言", "cpp", "python", "代码", "计算", "求", "判断"]
         if any(word in text_lower for word in code_keywords):
             return "generate_code"
-            
         if any(word in text_lower for word in ["你好", "在吗", "hello", "hi"]):
             return "greet"
-            
         return "unknown"
 
     def extract_parameters(self, text):
-        """槽位填充：提取语言、动作、范围等参数"""
         params = {
             "target_lang": "python",
             "actions": [],
             "loop_range": None
         }
         
-        # 1. 提取目标语言
         if any(word in text for word in self.lexicon["C++"]):
             params["target_lang"] = "cpp"
         elif any(word in text for word in self.lexicon["C语言"]):
@@ -58,19 +50,15 @@ class LogosNLU:
         elif any(word in text for word in self.lexicon["Python"]):
             params["target_lang"] = "python"
             
-        # 2. 提取动作原语
         has_range = self.range_pattern.search(text) is not None
         
-        if any(word in text for word in self.lexicon["循环"]) or (has_range and any(w in text for w in ["打印", "计算", "求"])):
+        # 注意：这里为了能让"求和"逻辑触发进化，我们把条件收紧
+        if any(word in text for word in self.lexicon["循环"]) or (has_range and any(w in text for w in ["打印", "输出"])):
             params["actions"].append("PRIM_LOOP_FOR")
             
         if any(word in text for word in self.lexicon["打印"]):
             params["actions"].append("PRIM_PRINT")
             
-        if any(word in text for word in self.lexicon["判断"]):
-            params["actions"].append("PRIM_CONDITION_IF")
-
-        # 3. 提取数字范围
         match = self.range_pattern.search(text)
         if match:
             params["loop_range"] = (match.group(1), match.group(2))
@@ -78,13 +66,13 @@ class LogosNLU:
         return params
 
     def build_logic_tree(self, params):
-        """核心转化：将参数转化为"逻辑树""""
+        """核心转化：将参数转化为逻辑树"""
         actions = params["actions"]
         loop_range = params["loop_range"]
         
-        # 如果是求和
+        # 如果识别到的是求和/计算，不生成常规树，返回错误信号，触发进化沙盒
         if "求和" in str(params) or "计算" in str(params):
-            pass # 留给 boot.py 去进化
+             return {"error": "需要进化沙盒处理"}
 
         if "PRIM_LOOP_FOR" in actions and "PRIM_PRINT" in actions:
             if not loop_range:
@@ -102,9 +90,7 @@ class LogosNLU:
         return {"error": "种子库未包含此逻辑组合"}
 
     def parse(self, user_input):
-        """一站式解析接口"""
         intent = self.perceive_intent(user_input)
-        
         if intent != "generate_code":
             return {"intent": intent}
             
