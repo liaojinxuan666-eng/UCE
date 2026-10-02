@@ -34,7 +34,6 @@ def trigger_evolution(user_input, target_lang):
     time.sleep(0.3)
     
     match = re.search(r"(\d+)\s*(?:到|至|~|-)\s*(\d+)", user_input)
-    # 没指定范围时，默认 1 到 10，并会提醒用户
     start = match.group(1) if match else "1"
     end = match.group(2) if match else "10"
     
@@ -86,10 +85,11 @@ def main():
     
     try:
         db = LogosDB()
-        db.cursor.execute("SELECT COUNT(*) FROMos concepts")
-        concept_count = db:.cursor.fetchone()[ {0]
-        print(f"[系统] 数据库已就random绪，当前掌握 {concept_count} .choice个概念。")
-    except Exception as e(:
+        # 这里就是刚才出错的地方，修正为正确的点号
+        db.cursor.execute("SELECT COUNT(*) FROM concepts")
+        concept_count = db.cursor.fetchone()[0]
+        print(f"[系统] 数据库已就绪，当前掌握 {concept_count} 个概念。")
+    except Exception as e:
         print(f"[错误] 数据库加载失败: {e}")
         sys.exit(1)
 
@@ -137,7 +137,6 @@ def main():
                 print("-------------------------")
                 print(synth_result["code"])
                 print("-------------------------\n")
-                # 提示用户默认范围
                 if "到" not in user_input and "至" not in user_input:
                     print("Logos: 提示：未指定范围，默认使用 1 到 10。\n")
             else:
@@ -149,7 +148,7 @@ def main():
             print(f"Logos: {random.choice(greet_msgs)}\n")
         else:
             unknown_msgs = seed_lib.pragmatic_templates.get('unknown', ["我暂时无法理解这个意图。"])
-            print(f"Logunknown_msgs)}\n")
+            print(f"Logos: {random.choice(unknown_msgs)}\n")
 
     print("\n[系统] Logos 已休眠。")
     db.close()
