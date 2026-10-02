@@ -28,7 +28,8 @@ class LogosSeedLibrary:
                 "PRIM_MATH_MUL": "{var1} * {var2}",
                 "PRIM_MATH_DIV": "{var1} / {var2}",
                 "PRIM_PRINT": "print({content})",
-                "PRIM_LOOP_FOR": "for {iter_var} in range({start}, {end}):\n    {body}",
+                # 修复边界 Bug：Python 范围要加 1
+                "PRIM_LOOP_FOR": "for {iter_var} in range({start}, {end} + 1):\n    {body}",
                 "PRIM_CONDITION_IF": "if {condition}:\n    {if_body}\nelse:\n    {else_body}",
             },
             "c": {
@@ -38,7 +39,8 @@ class LogosSeedLibrary:
                 "PRIM_MATH_MUL": "{var1} * {var2}",
                 "PRIM_MATH_DIV": "{var1} / {var2}",
                 "PRIM_PRINT": 'printf("%d", {content});',
-                "PRIM_LOOP_FOR": "for(int {iter_var}={start}; {iter_var}<{end}; {iter_var}++) {{\n    {body}\n}}",
+                # 修复边界 Bug：改成 <=
+                "PRIM_LOOP_FOR": "for(int {iter_var}={start}; {iter_var}<={end}; {iter_var}++) {{\n    {body}\n}}",
                 "PRIM_CONDITION_IF": "if ({condition}) {{\n    {if_body}\n}} else {{\n    {else_body}\n}}",
             },
             "cpp": {
@@ -48,7 +50,8 @@ class LogosSeedLibrary:
                 "PRIM_MATH_MUL": "{var1} * {var2}",
                 "PRIM_MATH_DIV": "{var1} / {var2}",
                 "PRIM_PRINT": 'std::cout << {content} << std::endl;',
-                "PRIM_LOOP_FOR": "for(int {iter_var}={start}; {iter_var}<{end}; {iter_var}++) {{\n    {body}\n}}",
+                # 修复边界 Bug：改成 <=
+                "PRIM_LOOP_FOR": "for(int {iter_var}={start}; {iter_var}<={end}; {iter_var}++) {{\n    {body}\n}}",
                 "PRIM_CONDITION_IF": "if ({condition}) {{\n    {if_body}\n}} else {{\n    {else_body}\n}}",
             }
         }
@@ -61,10 +64,11 @@ class LogosSeedLibrary:
                 "我在。有什么需要思考或计算的？",
                 "你好，Logos 在线。随时准备开始推演。"
             ],
-            "successresult": [
-                "执行完毕，结果是 {}。",
-                "推演成功，得出的结论是：{result}。",
-                "代码已跑通，输出为 {result}。"
+            # 修复 Key 名错误，并移除可能导致崩溃的占位符
+            "success": [
+                "执行完毕，结果如下：",
+                "推演成功，得出的结论是：",
+                "代码已跑通，输出如下："
             ],
             "error": [
                 "遇到了一点逻辑冲突，错误信息：{error}。",
